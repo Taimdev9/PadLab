@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PadLab — Universal Controller Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ========== LOADING SCREEN ========== -->
+<div id="loader" class="loader-screen">
+  <div class="loader-content">
+    <div class="loader-ring"></div>
+    <h1 class="loader-title">PadLab</h1>
+    <p class="loader-sub" data-i18n="loading">Preparing your controller lab…</p>
+    <div class="loader-bar"><div id="loaderFill" class="loader-fill"></div></div>
+    <button id="continueBtn" class="btn-continue hidden" data-i18n="continue">Continue</button>
+  </div>
+</div>
+
+<!-- ========== MAIN APP ========== -->
+<main id="app" class="app hidden">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">🎮</span>
+      <span class="brand-name">PadLab</span>
+    </div>
+    <div class="header-actions">
+      <button id="langToggle" class="lang-btn" title="Switch language">AR</button>
+      <span id="statusBadge" class="status-badge idle" data-i18n="notConnected">Not connected</span>
+    </div>
+  </header>
+
+  <!-- Controller visual -->
+  <section class="controller-stage">
+    <div class="controller-wrap">
+      <!-- SVG placeholder: app.js will inject the right controller SVG -->
+      <div id="controllerSvgContainer" class="controller-svg"></div>
+    </div>
+    <p class="hint" data-i18n="connectHint">Connect your controller via USB or Bluetooth, then press any button.</p>
+  </section>
+
+  <!-- Panels -->
+  <section class="panels">
+
+    <!-- Panel 1: Visual Skin -->
+    <div class="card">
+      <h3 data-i18n="skinTitle">🎨 Controller Skin (visual)</h3>
+      <div class="swatches" id="skinSwatches">
+        <button class="swatch active" data-color="#2c2c36" style="--c:#2c2c36"></button>
+        <button class="swatch" data-color="#e8e8ee" style="--c:#e8e8ee"></button>
+        <button class="swatch" data-color="#1f4e8c" style="--c:#1f4e8c"></button>
+        <button class="swatch" data-color="#b8232e" style="--c:#b8232e"></button>
+        <button class="swatch" data-color="#c9a227" style="--c:#c9a227"></button>
+        <button class="swatch" data-color="#3e7a4e" style="--c:#3e7a4e"></button>
+        <button class="swatch" data-color="#7a3e8c" style="--c:#7a3e8c"></button>
+        <input type="color" id="skinPicker" value="#2c2c36" title="Custom color">
+      </div>
+      <p class="note" data-i18n="skinNote">Changes the on-screen controller only.</p>
+    </div>
+
+    <!-- Panel 2: Real Lightbar -->
+    <div class="card">
+      <h3 data-i18n="lightbarTitle">💡 Real Lightbar (WebHID)</h3>
+      <div class="row">
+        <button id="connectHidBtn" class="btn primary" data-i18n="connectHid">Connect via WebHID</button>
+        <input type="color" id="realLightbarColor" value="#0044ff" disabled>
+      </div>
+      <p id="hidStatus" class="note" data-i18n="hidNote">Requires Chrome/Edge. USB recommended for reliable writes.</p>
+    </div>
+
+    <!-- Panel 3: Drift Test -->
+    <div class="card">
+      <h3 data-i18n="driftTitle">🩺 Analog Drift Test</h3>
+      <div class="row">
+        <button id="startDriftBtn" class="btn green" data-i18n="startDrift">Start test (3s)</button>
+        <button id="stopDriftBtn" class="btn red" disabled data-i18n="stopDrift">Stop</button>
+      </div>
+      <div id="driftResult" class="drift-result idle" data-i18n="driftIdle">Test not started yet</div>
+      <div class="drift-meter"><div id="driftMeterFill" class="drift-meter-fill"></div></div>
+      <p class="axis-readout" id="axisReadout">L: (0.00, 0.00) &nbsp; R: (0.00, 0.00)</p>
+      <p class="note" data-i18n="driftNote">Healthy &lt; 0.05 — Warning 0.05–0.15 — Severe &gt; 0.15</p>
+    </div>
+
+  </section>
+
+  <footer class="app-footer">
+    <span data-i18n="footer">PadLab — built for the web. No data leaves your browser.</span>
+  </footer>
+
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
