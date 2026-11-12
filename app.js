@@ -255,4 +255,399 @@ const SVG_XBOX = `
   <g id="btn-L2" transform="translate(220,72) rotate(-20)"><rect x="-38" y="-16" width="76" height="30" rx="10" fill="url(#buttonGrad)" stroke="#000"/><text x="0" y="2" text-anchor="middle" font-size="9" fill="#777" font-weight="700">LT</text></g>
   <g id="btn-R2" transform="translate(580,72) rotate(20)"><rect x="-38" y="-16" width="76" height="30" rx="10" fill="url(#buttonGrad)" stroke="#000"/><text x="0" y="2" text-anchor="middle" font-size="9" fill="#777" font-weight="700">RT</text></g>
   <!-- Xbox button (center) -->
-  <g id="btn-PS"><circle cx="400"
+  <g id="btn-PS"><circle cx="400" cy="200" r="14" fill="#222" stroke="#555" stroke-width="1.5"/><circle cx="400" cy="200" r="7" fill="none" stroke="#3eb863" stroke-width="2"/></g>
+  <!-- View / Menu -->
+  <g id="btn-share"><rect x="300" y="185" width="16" height="10" rx="3" fill="#333" stroke="#555"/></g>
+  <g id="btn-options"><rect x="484" y="185" width="16" height="10" rx="3" fill="#333" stroke="#555"/></g>
+  <!-- Left stick -->
+  <g><circle id="btn-L3" cx="240" cy="255" r="48" fill="url(#stickBase)" stroke="#000" stroke-width="2"/><g id="leftStickKnob" class="stick-knob"><circle cx="240" cy="255" r="34" fill="url(#stickKnob)"/><circle cx="240" cy="255" r="34" fill="none" stroke="#000" stroke-width="1.5"/></g></g>
+  <!-- D-pad -->
+  <g id="dpad-up"><rect x="227" y="345" width="26" height="42" rx="5" fill="url(#buttonGrad)" stroke="#000"/></g>
+  <g id="dpad-down"><rect x="227" y="393" width="26" height="42" rx="5" fill="url(#buttonGrad)" stroke="#000"/></g>
+  <g id="dpad-left"><rect x="200" y="377" width="42" height="26" rx="5" fill="url(#buttonGrad)" stroke="#000"/></g>
+  <g id="dpad-right"><rect x="238" y="377" width="42" height="26" rx="5" fill="url(#buttonGrad)" stroke="#000"/></g>
+  <!-- Face buttons (colored letters) -->
+  <g id="btn-cross"><circle cx="555" cy="205" r="16" fill="url(#buttonGrad)" stroke="#000"/><text x="555" y="211" text-anchor="middle" font-size="12" fill="#3eb863" font-weight="800">A</text></g>
+  <g id="btn-circle"><circle cx="595" cy="245" r="16" fill="url(#buttonGrad)" stroke="#000"/><text x="595" y="251" text-anchor="middle" font-size="12" fill="#e5333b" font-weight="800">B</text></g>
+  <g id="btn-square"><circle cx="555" cy="285" r="16" fill="url(#buttonGrad)" stroke="#000"/><text x="555" y="291" text-anchor="middle" font-size="12" fill="#4a90e2" font-weight="800">X</text></g>
+  <g id="btn-triangle"><circle cx="515" cy="245" r="16" fill="url(#buttonGrad)" stroke="#000"/><text x="515" y="251" text-anchor="middle" font-size="12" fill="#facc15" font-weight="800">Y</text></g>
+  <!-- Right stick -->
+  <g><circle id="btn-R3" cx="555" cy="385" r="48" fill="url(#stickBase)" stroke="#000" stroke-width="2"/><g id="rightStickKnob" class="stick-knob"><circle cx="555" cy="385" r="34" fill="url(#stickKnob)"/><circle cx="555" cy="385" r="34" fill="none" stroke="#000" stroke-width="1.5"/></g></g>
+</svg>`;
+
+/* ---------- GAMEPAD STATE ---------- */
+const BTN_MAP = {
+  0: 'btn-cross', 1: 'btn-circle', 2: 'btn-square', 3: 'btn-triangle',
+  4: 'btn-L1', 5: 'btn-R1', 6: 'btn-L2', 7: 'btn-R2',
+  8: 'btn-share', 9: 'btn-options', 10: 'btn-L3', 11: 'btn-R3',
+  12: 'dpad-up', 13: 'dpad-down', 14: 'dpad-left', 15: 'dpad-right',
+  16: 'btn-PS', 17: 'btn-touchpad'
+};
+
+const COLOR_MAP = { 0: 'hl-blue', 1: 'hl-red', 2: 'hl-pink', 3: 'hl-green' };
+const MAX_TRAVEL = 13;
+let prevPressed = {};
+let currentPad = null;
+let currentControllerType = 'unknown'; // 'ps4' | 'ps5' | 'xbox' | 'unknown'
+
+/* ---------- DOM REFS ---------- */
+const statusBadge = document.getElementById('statusBadge');
+const controllerContainer = document.getElementById('controllerSvgContainer');
+const hidStatusEl = document.getElementById('hidStatus');
+const driftResult = document.getElementById('driftResult');
+const driftMeterFill = document.getElementById('driftMeterFill');
+const axisReadout = document.getElementById('axisReadout');
+
+/* ---------- UI UPDATERS ---------- */
+function updateStatusUI() {
+  if (!statusBadge) return;
+  if (currentPad) {
+    statusBadge.textContent = t('connected') + ' — ' + (currentControllerType === 'ps4' ? t('controllerPS4') : currentControllerType === 'ps5' ? t('controllerPS5') : currentControllerType === 'xbox' ? t('controllerXbox') : t('controllerUnknown'));
+    statusBadge.className = 'status-badge connected';
+  } else {
+    statusBadge.textContent = t('notConnected');
+    statusBadge.className = 'status-badge idle';
+  }
+}
+
+function updateHidStatusUI() {
+  if (!hidStatusEl) return;
+  // handled in connectHID and elsewhere
+}
+
+function updateDriftResultUI() {
+  // handled in finishDrift
+}
+
+/* ---------- DETECT CONTROLLER TYPE ---------- */
+function detectControllerType(gamepad) {
+  const id = (gamepad.id || '').toLowerCase();
+  if (id.includes('dualsense') || id.includes('ps5') || id.includes('0ce6')) return 'ps5';
+  if (id.includes('dualshock') || id.includes('ps4') || id.includes('05c4') || id.includes('09cc')) return 'ps4';
+  if (id.includes('xbox') || id.includes('xinput')) return 'xbox';
+  // Fallback: mapping standard and vendor
+  if (gamepad.mapping === 'standard') {
+    // Unknown standard gamepad, default to Xbox layout
+    return 'xbox';
+  }
+  return 'unknown';
+}
+
+/* ---------- RENDER CONTROLLER SVG ---------- */
+function renderController(type) {
+  if (type === 'ps5') controllerContainer.innerHTML = SVG_PS5;
+  else if (type === 'ps4') controllerContainer.innerHTML = SVG_PS4;
+  else controllerContainer.innerHTML = SVG_XBOX; // default / unknown → Xbox layout
+
+  // Re-apply skin color if custom
+  applyBodyColor(currentSkinColor);
+}
+
+/* ---------- SKIN COLOR ---------- */
+let currentSkinColor = '#2c2c36';
+
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16)
+  };
+}
+function mix(hex1, hex2, p) {
+  const a = hexToRgb(hex1), b = hexToRgb(hex2);
+  return `rgb(${Math.round(a.r + (b.r - a.r) * p)},${Math.round(a.g + (b.g - a.g) * p)},${Math.round(a.b + (b.b - a.b) * p)})`;
+}
+function applyBodyColor(baseHex) {
+  currentSkinColor = baseHex;
+  const grad = document.getElementById('bodyGrad');
+  if (!grad) return;
+  const stops = grad.querySelectorAll('stop');
+  if (stops.length >= 3) {
+    stops[0].setAttribute('stop-color', mix(baseHex, '#ffffff', .35));
+    stops[1].setAttribute('stop-color', baseHex);
+    stops[2].setAttribute('stop-color', mix(baseHex, '#000000', .55));
+  }
+}
+
+/* Skin swatches */
+document.querySelectorAll('.swatch').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const c = btn.dataset.color;
+    document.getElementById('skinPicker').value = c;
+    applyBodyColor(c);
+  });
+});
+document.getElementById('skinPicker').addEventListener('input', e => {
+  document.querySelectorAll('.swatch').forEach(b => b.classList.remove('active'));
+  applyBodyColor(e.target.value);
+});
+
+/* ---------- GAMEPAD CONNECTION ---------- */
+window.addEventListener('gamepadconnected', e => {
+  currentPad = e.gamepad;
+  currentControllerType = detectControllerType(e.gamepad);
+  renderController(currentControllerType);
+  updateStatusUI();
+});
+
+window.addEventListener('gamepaddisconnected', () => {
+  currentPad = null;
+  currentControllerType = 'unknown';
+  updateStatusUI();
+  // Reset highlights
+  Object.values(BTN_MAP).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('hl', 'hl-red', 'hl-green', 'hl-blue', 'hl-pink');
+  });
+  const l = document.getElementById('leftStickKnob');
+  const r = document.getElementById('rightStickKnob');
+  if (l) l.setAttribute('transform', 'translate(0,0)');
+  if (r) r.setAttribute('transform', 'translate(0,0)');
+  resetDriftUI();
+});
+
+/* ---------- HIGHLIGHT & STICKS ---------- */
+function applyHighlight(id, pressed, idx) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const colorClass = COLOR_MAP[idx];
+  if (pressed && !prevPressed[id]) {
+    el.classList.add('hl');
+    if (colorClass) el.classList.add(colorClass);
+  } else if (!pressed && prevPressed[id]) {
+    el.classList.remove('hl', 'hl-red', 'hl-green', 'hl-blue', 'hl-pink');
+  }
+  prevPressed[id] = pressed;
+}
+
+function updateSticks(pad) {
+  const lx = pad.axes[0] || 0, ly = pad.axes[1] || 0;
+  const rx = pad.axes[2] || 0, ry = pad.axes[3] || 0;
+  const l = document.getElementById('leftStickKnob');
+  const r = document.getElementById('rightStickKnob');
+  if (l) l.setAttribute('transform', `translate(${(lx * MAX_TRAVEL).toFixed(2)},${(ly * MAX_TRAVEL).toFixed(2)})`);
+  if (r) r.setAttribute('transform', `translate(${(rx * MAX_TRAVEL).toFixed(2)},${(ry * MAX_TRAVEL).toFixed(2)})`);
+  if (axisReadout) axisReadout.textContent = `L: (${lx.toFixed(2)}, ${ly.toFixed(2)})  R: (${rx.toFixed(2)}, ${ry.toFixed(2)})`;
+}
+
+/* Main loop */
+function loop() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let pad = null;
+  for (const p of pads) { if (p) { pad = p; break; } }
+  if (pad && pad !== currentPad) {
+    currentPad = pad;
+    currentControllerType = detectControllerType(pad);
+    renderController(currentControllerType);
+    updateStatusUI();
+  }
+  if (pad) {
+    for (const [idx, id] of Object.entries(BTN_MAP)) {
+      const b = pad.buttons[idx];
+      applyHighlight(id, b && b.pressed, Number(idx));
+    }
+    updateSticks(pad);
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ---------- WEBHID — REAL LIGHTBAR ---------- */
+let hidDevice = null;
+let ds4Instance = null;   // webhid-ds4 instance
+let ds5Controller = null; // DualSense controller instance
+
+document.getElementById('connectHidBtn').addEventListener('click', async () => {
+  if (!navigator.hid) {
+    hidStatusEl.textContent = t('hidUnsupported');
+    return;
+  }
+  try {
+    // Request both DS4 and DualSense
+    const devices = await navigator.hid.requestDevice({
+      filters: [
+        { vendorId: 0x054c, productId: 0x09cc }, // DS4 v2
+        { vendorId: 0x054c, productId: 0x05c4 }, // DS4 v1
+        { vendorId: 0x054c, productId: 0x0ce6 }, // DualSense
+      ]
+    });
+    if (!devices.length) {
+      hidStatusEl.textContent = t('hidNoDevice');
+      return;
+    }
+    hidDevice = devices[0];
+    if (!hidDevice.opened) await hidDevice.open();
+
+    // Try to initialize the right library
+    const pid = hidDevice.productId;
+    if (pid === 0x09cc || pid === 0x05c4) {
+      // DualShock 4 → webhid-ds4
+      const mod = await import('https://cdn.jsdelivr.net/npm/webhid-ds4@1.0.5/+esm');
+      ds4Instance = new mod.DualShock4();
+      await ds4Instance.init();
+      hidStatusEl.textContent = t('hidConnected') + ' (DS4)';
+    } else if (pid === 0x0ce6) {
+      // DualSense → @proj-airi/input-playstation-dualsense-5
+      const mod = await import('https://cdn.jsdelivr.net/npm/@proj-airi/input-playstation-dualsense-5@0.1.0/+esm');
+      const device = await mod.requestDualSenseDevice(); // may request again, but okay
+      if (device) {
+        ds5Controller = new mod.DualSenseController(device);
+        await ds5Controller.open();
+        hidStatusEl.textContent = t('hidConnected') + ' (DualSense)';
+      }
+    }
+
+    document.getElementById('realLightbarColor').disabled = false;
+    document.getElementById('connectHidBtn').textContent = '✓ ' + t('connected');
+    document.getElementById('connectHidBtn').classList.remove('primary');
+    document.getElementById('connectHidBtn').classList.add('green');
+  } catch (err) {
+    console.error(err);
+    hidStatusEl.textContent = t('hidError') + (err.message || err);
+  }
+});
+
+/* Real lightbar color change */
+document.getElementById('realLightbarColor').addEventListener('input', async (e) => {
+  const hex = e.target.value;
+  const { r, g, b } = hexToRgb(hex);
+
+  // Update visual lightbar on screen too
+  const lb = document.getElementById('lightbarSvg');
+  if (lb) {
+    lb.querySelectorAll('stop').forEach((s, i) => {
+      s.setAttribute('stop-color', i === 0 ? mix(hex, '#fff', .4) : i === 1 ? hex : mix(hex, '#000', .4));
+    });
+  }
+
+  try {
+    if (ds4Instance && ds4Instance.lightbar) {
+      await ds4Instance.lightbar.setColorRGB(r, g, b);
+    } else if (ds5Controller) {
+      const output = { lightbar: { red: r, green: g, blue: b } };
+      await ds5Controller.sendOutput(output);
+    } else if (hidDevice && (hidDevice.productId === 0x09cc || hidDevice.productId === 0x05c4)) {
+      // Fallback: raw report for DS4
+      await sendDS4LightbarReport(hidDevice, r, g, b);
+    }
+  } catch (err) {
+    console.warn('Lightbar write error:', err);
+  }
+});
+
+/* Fallback DS4 report (USB) */
+async function sendDS4LightbarReport(device, r, g, b) {
+  const reportId = 0x05;
+  const buf = new Uint8Array(32);
+  buf[0] = reportId;
+  buf[1] = 0xff;
+  buf[6] = r; buf[7] = g; buf[8] = b;
+  await device.sendReport(reportId, buf);
+}
+
+/* ---------- DRIFT TEST ---------- */
+let driftRunning = false;
+let driftSamples = [];
+let driftStartTime = 0;
+const DRIFT_DURATION = 3000;
+const DRIFT_OK = 0.05;
+const DRIFT_WARN = 0.15;
+
+const btnStart = document.getElementById('startDriftBtn');
+const btnStop = document.getElementById('stopDriftBtn');
+
+function resetDriftUI() {
+  driftResult.className = 'drift-result idle';
+  driftResult.textContent = t('driftIdle');
+  driftMeterFill.style.width = '0%';
+  driftSamples = [];
+  driftRunning = false;
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+}
+
+btnStart.addEventListener('click', () => {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let pad = null;
+  for (const p of pads) { if (p) { pad = p; break; } }
+  if (!pad) {
+    driftResult.className = 'drift-result idle';
+    driftResult.textContent = t('noGamepad');
+    return;
+  }
+  driftSamples = [];
+  driftStartTime = performance.now();
+  driftRunning = true;
+  btnStart.disabled = true;
+  btnStop.disabled = false;
+  driftResult.className = 'drift-result idle';
+  driftResult.textContent = t('driftCollecting');
+
+  function collect() {
+    if (!driftRunning) return;
+    const now = performance.now();
+    const pads2 = navigator.getGamepads ? navigator.getGamepads() : [];
+    let p2 = null;
+    for (const q of pads2) { if (q) { p2 = q; break; } }
+    if (p2) {
+      driftSamples.push({
+        lx: p2.axes[0] || 0, ly: p2.axes[1] || 0,
+        rx: p2.axes[2] || 0, ry: p2.axes[3] || 0
+      });
+    }
+    if (now - driftStartTime < DRIFT_DURATION) {
+      requestAnimationFrame(collect);
+    } else {
+      finishDrift();
+    }
+  }
+  collect();
+});
+
+btnStop.addEventListener('click', () => {
+  driftRunning = false;
+  finishDrift();
+});
+
+function finishDrift() {
+  driftRunning = false;
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+
+  if (driftSamples.length < 10) {
+    driftResult.className = 'drift-result idle';
+    driftResult.textContent = t('driftNotEnough');
+    return;
+  }
+
+  let sumL = 0, sumR = 0, n = driftSamples.length;
+  let maxL = 0, maxR = 0;
+  for (const s of driftSamples) {
+    const magL = Math.sqrt(s.lx * s.lx + s.ly * s.ly);
+    const magR = Math.sqrt(s.rx * s.rx + s.ry * s.ry);
+    sumL += magL; sumR += magR;
+    maxL = Math.max(maxL, magL);
+    maxR = Math.max(maxR, magR);
+  }
+  const avgL = sumL / n, avgR = sumR / n;
+  const worstAvg = Math.max(avgL, avgR);
+  const worstMax = Math.max(maxL, maxR);
+
+  let verdict, cls;
+  if (worstAvg < DRIFT_OK) { verdict = t('driftHealthy'); cls = 'ok'; }
+  else if (worstAvg < DRIFT_WARN) { verdict = t('driftWarning'); cls = 'warn'; }
+  else { verdict = t('driftSevere'); cls = 'bad'; }
+
+  driftResult.className = 'drift-result ' + cls;
+  driftResult.textContent = `${verdict} — L:${avgL.toFixed(3)} R:${avgR.toFixed(3)} (max: ${worstMax.toFixed(3)})`;
+  const pct = Math.min(100, (worstAvg / 0.30) * 100);
+  driftMeterFill.style.width = pct + '%';
+}
+
+/* ---------- BOOT ---------- */
+applyLanguage('en');
+renderController('xbox'); // default visual until a controller connects
