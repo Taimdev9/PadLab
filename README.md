@@ -2,10 +2,19 @@
 
 A browser-based controller lab for **PlayStation 4 (DualShock 4)**, **PlayStation 5 (DualSense)**, and **Xbox** controllers.
 
-Built with plain **HTML, CSS, and JavaScript** — no build step, no backend. Ready to deploy on **GitHub Pages**.
+Built with plain **HTML, CSS, and JavaScript** — no build step, no backend. Fully deployable on **GitHub Pages**.
 
-![License](https://img.shields.io/badge/license-MIT-blue)
-![WebHID](https://img.shields.io/badge/WebHID-Chrome%2FEdge-green)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-PadLab-brightgreen?style=for-the-badge&logo=github)](https://taimdev9.github.io/PadLab/)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+[![WebHID](https://img.shields.io/badge/WebHID-Chrome%2FEdge-green?style=for-the-badge)](https://developer.mozilla.org/en-US/docs/Web/API/WebHID_API)
+
+---
+
+## 🚀 Live Demo
+
+👉 **Try it now:** **[https://taimdev9.github.io/PadLab/](https://taimdev9.github.io/PadLab/)**
+
+> Connect your controller via USB or Bluetooth, press any button, and the lab will detect it automatically.
 
 ---
 
@@ -26,6 +35,4 @@ Built with plain **HTML, CSS, and JavaScript** — no build step, no backend. Re
 
 ---
 
-## 🚀 Live Demo (GitHub Pages)
-
-Once you push this repository and enable **GitHub Pages** (see below), your demo will be available at:
+## 📦 Project Structure
